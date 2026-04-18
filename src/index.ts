@@ -23,6 +23,10 @@ export type { IBedrockClient } from "./interfaces/bedrock.interface.js";
 export type { IOpenSearchClient } from "./interfaces/opensearch.interface.js";
 export type { IStsClient } from "./interfaces/sts.interface.js";
 
+// Orchestration
+export { RagAgentOrchestrator } from "./orchestration/rag-agent.orchestrator.js";
+export type { IRagAgentOrchestrator } from "./interfaces/rag-agent.interface.js";
+
 // Types
 export * from "./types/common.types.js";
 export * from "./types/s3.types.js";
@@ -31,3 +35,4 @@ export * from "./types/dynamo.types.js";
 export * from "./types/bedrock.types.js";
 export * from "./types/opensearch.types.js";
 export * from "./types/sts.types.js";
+export * from "./types/rag-agent.types.js";
