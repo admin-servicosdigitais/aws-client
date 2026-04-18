@@ -35,33 +35,6 @@ export interface IndexInfo {
   storeSize: string;
 }
 
-export interface IndexDocumentOptions {
-  id?: string;
-  routing?: string;
-  refresh?: "true" | "false" | "wait_for";
-}
-
-export interface BulkOperation<T> {
-  action: "index" | "create" | "update" | "delete";
-  id?: string;
-  routing?: string;
-  document?: T;
-  updateScript?: string;
-}
-
-export interface BulkResultItem {
-  action: string;
-  id: string;
-  status: number;
-  error?: { type: string; reason: string };
-}
-
-export interface BulkResult {
-  took: number;
-  errors: boolean;
-  items: BulkResultItem[];
-}
-
 export interface SearchQuery {
   query?: Record<string, unknown>;
   knn?: {
@@ -97,15 +70,4 @@ export interface SearchResult<T> {
   aggregations?: Record<string, unknown>;
   took: number;
   timedOut: boolean;
-}
-
-export interface UpdateDocumentOptions {
-  retryOnConflict?: number;
-  refresh?: "true" | "false" | "wait_for";
-}
-
-export interface ScrollResult<T> {
-  scrollId: string;
-  result: SearchResult<T>;
-  done: boolean;
 }
