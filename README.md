@@ -91,6 +91,10 @@ const provider = new AwsProvider({
 // Credenciais do ambiente (IAM role, ~/.aws/credentials, env vars)
 const provider = new AwsProvider({ region: 'us-east-1' });
 
+// Assume role automática com refresh contínuo (STS)
+process.env.AWS_ASSUME_ROLE = 'arn:aws:iam::999888777666:role/BedrockDeployRole';
+const assumedRoleProvider = new AwsProvider({ region: 'us-east-1' });
+
 // Endpoint customizado (LocalStack, por exemplo)
 const provider = new AwsProvider({
   region: 'us-east-1',
@@ -217,32 +221,24 @@ console.log(resposta.completion);
 
 ### Cross-account com STS
 
-Se o agente precisa operar em uma conta AWS diferente da que está executando o código, use STS para assumir a role antes de instanciar o provider:
+Se o agente precisa operar em uma conta AWS diferente da que está executando o código, configure `AWS_ASSUME_ROLE`. O provider usa `@aws-sdk/credential-providers` com `fromTemporaryCredentials`, pegando as credenciais-mestre via `defaultProvider()` e renovando automaticamente enquanto o processo estiver vivo:
 
 ```typescript
 import { AwsProvider, RagAgentOrchestrator } from '@erick/aws-client';
 
-// Provider na conta de origem (onde está a role de execução)
-const originProvider = new AwsProvider({ region: 'us-east-1' });
+process.env.AWS_ASSUME_ROLE = 'arn:aws:iam::999888777666:role/BedrockDeployRole';
+// opcional (senão usa aws-client-${Date.now()})
+process.env.AWS_ASSUME_ROLE_SESSION_NAME = 'sessao-rag-deploy';
 
-// Assumir role na conta de destino
-const credenciais = await originProvider.sts().assumeRole(
-  'arn:aws:iam::999888777666:role/BedrockDeployRole',
-  'sessao-rag-deploy',
-  { durationSeconds: 3600 },
-);
-
-// Provider na conta de destino com as credenciais temporárias
-const targetProvider = new AwsProvider({
-  region: 'us-east-1',
-  credentials: credenciais,
-});
+const provider = new AwsProvider({ region: 'us-east-1' });
 
 const orchestrator = new RagAgentOrchestrator(
-  targetProvider.bedrock(),
-  targetProvider.opensearchServerless('https://<collection-id>.us-east-1.aoss.amazonaws.com'),
+  provider.bedrock(),
+  provider.opensearchServerless('https://<collection-id>.us-east-1.aoss.amazonaws.com'),
 );
 ```
+
+> **Importante:** no STS não existe sessão "permanente". O que existe aqui é renovação automática e contínua das credenciais temporárias enquanto o processo estiver ativo.
 
 ---
 

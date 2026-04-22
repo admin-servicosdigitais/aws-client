@@ -1,3 +1,5 @@
+import type { AwsCredentialIdentityProvider } from "@aws-sdk/types";
+
 export interface AwsCredentials {
   accessKeyId: string;
   secretAccessKey: string;
@@ -6,6 +8,6 @@ export interface AwsCredentials {
 
 export interface AwsProviderConfig {
   region: string;
-  credentials?: AwsCredentials;
+  credentials?: AwsCredentials | AwsCredentialIdentityProvider;
   endpoint?: string;
 }
