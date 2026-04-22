@@ -125,9 +125,7 @@ export class OpenSearchServerlessClientImpl implements IOpenSearchClient {
     if (!this.client) {
       const explicitCredentials = this.credentials;
       const getCredentials: () => Promise<AwsCredentialIdentity> = explicitCredentials
-        ? typeof explicitCredentials === "function"
-          ? explicitCredentials
-          : () => Promise.resolve(explicitCredentials)
+        ? () => Promise.resolve(typeof explicitCredentials === "function" ? explicitCredentials() : explicitCredentials)
         : () => defaultProvider()();
 
       this.client = new Client({

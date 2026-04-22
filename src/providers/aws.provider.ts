@@ -5,7 +5,8 @@ import { BedrockAgentClient } from "@aws-sdk/client-bedrock-agent";
 import { BedrockAgentRuntimeClient } from "@aws-sdk/client-bedrock-agent-runtime";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { STSClient as STSSDKClient } from "@aws-sdk/client-sts";
-import { AssumeRoleCommand } from "@aws-sdk/client-sts";
+import { defaultProvider } from "@aws-sdk/credential-provider-node";
+import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
 import type { AwsCredentialIdentityProvider } from "@aws-sdk/types";
 import type { AwsProviderConfig } from "../config/aws.config.js";
 import type { IS3Client } from "../interfaces/s3.interface.js";
@@ -23,6 +24,8 @@ import { StsClientImpl } from "../clients/sts.client.js";
 import { createCredentialProvider } from "../internal/utils/credentials.util.js";
 import { resolveCredentials } from "../internal/aws/credentials-resolver.js";
 
+type ResolvedCredentials = AwsProviderConfig["credentials"] | AwsCredentialIdentityProvider;
+
 export class AwsProvider {
   private _s3Sdk?: S3SDKClient;
   private _sqsSdk?: SQSSdkClient;
@@ -30,7 +33,7 @@ export class AwsProvider {
   private _bedrockAgentSdk?: BedrockAgentClient;
   private _bedrockRuntimeSdk?: BedrockAgentRuntimeClient;
   private _stsSdk?: STSSDKClient;
-  private _resolvedCredentials?: AwsProviderConfig["credentials"];
+  private resolvedCredentials?: ResolvedCredentials;
 
   constructor(private readonly config: AwsProviderConfig) {
     this._credentialProvider = createCredentialProvider(config.credentials);
@@ -87,12 +90,12 @@ export class AwsProvider {
   }
 
   private buildSdkConfig() {
-    const sdkConfig: {
-      region: string;
-      credentials?: Exclude<AwsProviderConfig["credentials"], undefined>;
-      endpoint?: string;
-    } = {
+    const credentials = this.resolveCredentials();
+
+    return {
       region: this.config.region,
+      ...(credentials !== undefined && { credentials }),
+      ...(this.config.endpoint !== undefined && { endpoint: this.config.endpoint }),
     };
 
     const credentials = this.resolveCredentials();
@@ -168,5 +171,38 @@ export class AwsProvider {
     }) satisfies AwsCredentialIdentityProvider;
 
     return this._resolvedCredentials;
+  }
+
+  private resolveCredentials(): ResolvedCredentials | undefined {
+    if (this.resolvedCredentials !== undefined) {
+      return this.resolvedCredentials;
+    }
+
+    if (this.config.credentials !== undefined) {
+      this.resolvedCredentials = this.config.credentials;
+      return this.resolvedCredentials;
+    }
+
+    const baseCredentialsProvider = defaultProvider();
+    const assumeRoleArn = process.env.AWS_ASSUME_ROLE;
+
+    if (!assumeRoleArn) {
+      this.resolvedCredentials = baseCredentialsProvider;
+      return this.resolvedCredentials;
+    }
+
+    if (!/^arn:aws(-[a-z]+)?:iam::\d{12}:role\/[\w+=,.@\/-]+$/.test(assumeRoleArn)) {
+      throw new Error(`Invalid AWS_ASSUME_ROLE value: ${assumeRoleArn}`);
+    }
+
+    this.resolvedCredentials = fromTemporaryCredentials({
+      masterCredentials: baseCredentialsProvider,
+      params: {
+        RoleArn: assumeRoleArn,
+        RoleSessionName: "aws-client-session",
+      },
+    });
+
+    return this.resolvedCredentials;
   }
 }
