@@ -98,6 +98,15 @@ const provider = new AwsProvider({
 });
 ```
 
+### Comportamento automático por env
+
+O `AwsProvider` aplica automaticamente a mesma estratégia de credenciais para todos os clientes (S3, SQS, DynamoDB, Bedrock, OpenSearch Serverless e STS):
+
+- `AWS_ASSUME_ROLE` **definida**: o provider sempre opera em **cross-account** via STS `AssumeRole`, com refresh automático de credenciais temporárias.
+- `AWS_ASSUME_ROLE` **ausente ou vazia**: o provider usa a credencial base da conta de origem (chain padrão do AWS SDK: env vars, profile, IAM role etc.).
+
+> Se `credentials` for informado explicitamente no construtor, ele tem precedência sobre o comportamento automático por variável de ambiente.
+
 ## RagAgentOrchestrator
 
 Abstração de alto nível que orquestra a criação completa de um Agente Bedrock com RAG em uma única chamada: cria o índice vetorial no OpenSearch Serverless (collection pré-existente), configura a Knowledge Base, aponta o Data Source para o S3, dispara a ingestão, cria o Agente, associa a KB e publica o alias — retornando `agentId` e `agentAliasId` prontos para `invokeAgent`.
@@ -217,7 +226,23 @@ console.log(resposta.completion);
 
 ### Cross-account com STS
 
-Se o agente precisa operar em uma conta AWS diferente da que está executando o código, use STS para assumir a role antes de instanciar o provider:
+Você ainda pode usar STS manualmente quando quiser controle fino sobre sessão/opções. Porém, na maioria dos casos, basta usar `AWS_ASSUME_ROLE` e deixar o provider resolver automaticamente.
+
+#### Exemplo mínimo (sem chamada manual de `assumeRole`)
+
+```typescript
+import { AwsProvider, RagAgentOrchestrator } from '@erick/aws-client';
+
+// Com AWS_ASSUME_ROLE definido no ambiente, o provider assume a role automaticamente.
+const provider = new AwsProvider({ region: 'us-east-1' });
+
+const orchestrator = new RagAgentOrchestrator(
+  provider.bedrock(),
+  provider.opensearchServerless('https://<collection-id>.us-east-1.aoss.amazonaws.com'),
+);
+```
+
+#### Exemplo manual com STS (opcional)
 
 ```typescript
 import { AwsProvider, RagAgentOrchestrator } from '@erick/aws-client';
