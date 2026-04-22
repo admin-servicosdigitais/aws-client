@@ -91,12 +91,25 @@ const provider = new AwsProvider({
 // Credenciais do ambiente (IAM role, ~/.aws/credentials, env vars)
 const provider = new AwsProvider({ region: 'us-east-1' });
 
+// Assume role automática com refresh contínuo (STS)
+process.env.AWS_ASSUME_ROLE = 'arn:aws:iam::999888777666:role/BedrockDeployRole';
+const assumedRoleProvider = new AwsProvider({ region: 'us-east-1' });
+
 // Endpoint customizado (LocalStack, por exemplo)
 const provider = new AwsProvider({
   region: 'us-east-1',
   endpoint: 'http://localhost:4566',
 });
 ```
+
+### Comportamento automático por env
+
+O `AwsProvider` aplica automaticamente a mesma estratégia de credenciais para todos os clientes (S3, SQS, DynamoDB, Bedrock, OpenSearch Serverless e STS):
+
+- `AWS_ASSUME_ROLE` **definida**: o provider sempre opera em **cross-account** via STS `AssumeRole`, com refresh automático de credenciais temporárias.
+- `AWS_ASSUME_ROLE` **ausente ou vazia**: o provider usa a credencial base da conta de origem (chain padrão do AWS SDK: env vars, profile, IAM role etc.).
+
+> Se `credentials` for informado explicitamente no construtor, ele tem precedência sobre o comportamento automático por variável de ambiente.
 
 ## RagAgentOrchestrator
 
@@ -217,32 +230,40 @@ console.log(resposta.completion);
 
 ### Cross-account com STS
 
-Se o agente precisa operar em uma conta AWS diferente da que está executando o código, use STS para assumir a role antes de instanciar o provider:
+Você ainda pode usar STS manualmente quando quiser controle fino sobre sessão/opções. Porém, na maioria dos casos, basta usar `AWS_ASSUME_ROLE` e deixar o provider resolver automaticamente.
+
+#### Exemplo mínimo (sem chamada manual de `assumeRole`)
 
 ```typescript
 import { AwsProvider, RagAgentOrchestrator } from '@erick/aws-client';
 
-// Provider na conta de origem (onde está a role de execução)
-const originProvider = new AwsProvider({ region: 'us-east-1' });
-
-// Assumir role na conta de destino
-const credenciais = await originProvider.sts().assumeRole(
-  'arn:aws:iam::999888777666:role/BedrockDeployRole',
-  'sessao-rag-deploy',
-  { durationSeconds: 3600 },
-);
-
-// Provider na conta de destino com as credenciais temporárias
-const targetProvider = new AwsProvider({
-  region: 'us-east-1',
-  credentials: credenciais,
-});
+// Com AWS_ASSUME_ROLE definido no ambiente, o provider assume a role automaticamente.
+const provider = new AwsProvider({ region: 'us-east-1' });
 
 const orchestrator = new RagAgentOrchestrator(
-  targetProvider.bedrock(),
-  targetProvider.opensearchServerless('https://<collection-id>.us-east-1.aoss.amazonaws.com'),
+  provider.bedrock(),
+  provider.opensearchServerless('https://<collection-id>.us-east-1.aoss.amazonaws.com'),
 );
 ```
+
+#### Exemplo manual com STS (opcional)
+
+```typescript
+import { AwsProvider, RagAgentOrchestrator } from '@erick/aws-client';
+
+process.env.AWS_ASSUME_ROLE = 'arn:aws:iam::999888777666:role/BedrockDeployRole';
+// opcional (senão usa aws-client-${Date.now()})
+process.env.AWS_ASSUME_ROLE_SESSION_NAME = 'sessao-rag-deploy';
+
+const provider = new AwsProvider({ region: 'us-east-1' });
+
+const orchestrator = new RagAgentOrchestrator(
+  provider.bedrock(),
+  provider.opensearchServerless('https://<collection-id>.us-east-1.aoss.amazonaws.com'),
+);
+```
+
+> **Importante:** no STS não existe sessão "permanente". O que existe aqui é renovação automática e contínua das credenciais temporárias enquanto o processo estiver ativo.
 
 ---
 

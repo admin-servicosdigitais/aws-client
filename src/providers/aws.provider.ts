@@ -3,6 +3,7 @@ import { SQSClient as SQSSdkClient } from "@aws-sdk/client-sqs";
 import { DynamoDBClient as DynamoSDKClient } from "@aws-sdk/client-dynamodb";
 import { BedrockAgentClient } from "@aws-sdk/client-bedrock-agent";
 import { BedrockAgentRuntimeClient } from "@aws-sdk/client-bedrock-agent-runtime";
+import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { STSClient as STSSDKClient } from "@aws-sdk/client-sts";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { fromTemporaryCredentials } from "@aws-sdk/credential-providers";
@@ -20,6 +21,8 @@ import { DynamoClientImpl } from "../clients/dynamo.client.js";
 import { BedrockClientImpl } from "../clients/bedrock.client.js";
 import { OpenSearchServerlessClientImpl } from "../clients/opensearch-serverless.client.js";
 import { StsClientImpl } from "../clients/sts.client.js";
+import { createCredentialProvider } from "../internal/utils/credentials.util.js";
+import { resolveCredentials } from "../internal/aws/credentials-resolver.js";
 
 type ResolvedCredentials = AwsProviderConfig["credentials"] | AwsCredentialIdentityProvider;
 
@@ -32,7 +35,9 @@ export class AwsProvider {
   private _stsSdk?: STSSDKClient;
   private resolvedCredentials?: ResolvedCredentials;
 
-  constructor(private readonly config: AwsProviderConfig) {}
+  constructor(private readonly config: AwsProviderConfig) {
+    this._credentialProvider = createCredentialProvider(config.credentials);
+  }
 
   s3(bucketName: string): IS3Client {
     return new S3ClientImpl(this.getS3Sdk(), bucketName);
@@ -92,6 +97,80 @@ export class AwsProvider {
       ...(credentials !== undefined && { credentials }),
       ...(this.config.endpoint !== undefined && { endpoint: this.config.endpoint }),
     };
+
+    const credentials = this.resolveCredentials();
+    if (credentials !== undefined) {
+      sdkConfig.credentials = credentials;
+    }
+
+    if (this.config.endpoint !== undefined) {
+      sdkConfig.endpoint = this.config.endpoint;
+    }
+
+    return sdkConfig;
+  }
+
+  private resolveCredentials(): AwsProviderConfig["credentials"] {
+    if (this._resolvedCredentials !== undefined) {
+      return this._resolvedCredentials;
+    }
+
+    if (this.config.credentials !== undefined) {
+      this._resolvedCredentials = this.config.credentials;
+      return this._resolvedCredentials;
+    }
+
+    const assumeRoleArn = process.env.AWS_ASSUME_ROLE?.trim();
+
+    if (!assumeRoleArn) {
+      return undefined;
+    }
+
+    const baseCredentialsProvider = defaultProvider();
+    const stsClient = new STSSDKClient({
+      region: this.config.region,
+      ...(this.config.endpoint !== undefined && { endpoint: this.config.endpoint }),
+      credentials: baseCredentialsProvider,
+    });
+
+    let cachedCredentials:
+      | { accessKeyId: string; secretAccessKey: string; sessionToken?: string; expiration?: Date }
+      | undefined;
+
+    const refreshBeforeMs = 5 * 60 * 1000;
+
+    this._resolvedCredentials = (async () => {
+      const now = Date.now();
+      if (
+        cachedCredentials?.accessKeyId &&
+        cachedCredentials.secretAccessKey &&
+        (cachedCredentials.expiration === undefined || cachedCredentials.expiration.getTime() - now > refreshBeforeMs)
+      ) {
+        return cachedCredentials;
+      }
+
+      const output = await stsClient.send(new AssumeRoleCommand({
+        RoleArn: assumeRoleArn,
+        RoleSessionName: `aws-client-${Date.now()}`,
+      }));
+
+      const credentials = output.Credentials;
+
+      if (!credentials?.AccessKeyId || !credentials.SecretAccessKey) {
+        throw new Error("AWS STS assume role did not return valid credentials");
+      }
+
+      cachedCredentials = {
+        accessKeyId: credentials.AccessKeyId,
+        secretAccessKey: credentials.SecretAccessKey,
+        ...(credentials.SessionToken !== undefined && { sessionToken: credentials.SessionToken }),
+        ...(credentials.Expiration !== undefined && { expiration: credentials.Expiration }),
+      };
+
+      return cachedCredentials;
+    }) satisfies AwsCredentialIdentityProvider;
+
+    return this._resolvedCredentials;
   }
 
   private resolveCredentials(): ResolvedCredentials | undefined {

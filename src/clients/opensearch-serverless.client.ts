@@ -2,7 +2,7 @@ import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import type { AwsCredentialIdentity, AwsCredentialIdentityProvider } from "@aws-sdk/types";
 import { AwsSigv4Signer } from "@opensearch-project/opensearch/aws-v3";
 import { Client } from "@opensearch-project/opensearch";
-import type { AwsCredentials } from "../config/aws.config.js";
+import type { AwsCredentialInput } from "../config/aws.config.js";
 import type { IOpenSearchClient } from "../interfaces/opensearch.interface.js";
 import type {
   CreateIndexOptions,
@@ -16,6 +16,7 @@ import type {
 } from "../types/opensearch.types.js";
 import { AwsClientError } from "../errors/aws-client.error.js";
 import { toAwsClientError } from "../internal/utils/error.util.js";
+import { createCredentialProvider } from "../internal/utils/credentials.util.js";
 
 interface CatIndexResponseItem {
   health?: string;
