@@ -2,7 +2,7 @@
 export { AwsProvider } from "./providers/aws.provider.js";
 
 // Config
-export type { AwsCredentials, AwsProviderConfig } from "./config/aws.config.js";
+export type { AwsCredentialInput, AwsCredentials, AwsProviderConfig } from "./config/aws.config.js";
 
 // Errors
 export { AwsClientError, NotImplementedError } from "./errors/aws-client.error.js";
