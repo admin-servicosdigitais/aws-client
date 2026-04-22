@@ -16,6 +16,7 @@ import type {
 } from "../types/opensearch.types.js";
 import { AwsClientError } from "../errors/aws-client.error.js";
 import { toAwsClientError } from "../internal/utils/error.util.js";
+import { createCredentialProvider } from "../internal/utils/credentials.util.js";
 
 interface CatIndexResponseItem {
   health?: string;

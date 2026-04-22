@@ -4,6 +4,7 @@ import { DynamoDBClient as DynamoSDKClient } from "@aws-sdk/client-dynamodb";
 import { BedrockAgentClient } from "@aws-sdk/client-bedrock-agent";
 import { BedrockAgentRuntimeClient } from "@aws-sdk/client-bedrock-agent-runtime";
 import { STSClient as STSSDKClient } from "@aws-sdk/client-sts";
+import type { AwsCredentialIdentity, AwsCredentialIdentityProvider } from "@aws-sdk/types";
 import type { AwsProviderConfig } from "../config/aws.config.js";
 import type { IS3Client } from "../interfaces/s3.interface.js";
 import type { ISQSClient } from "../interfaces/sqs.interface.js";
@@ -17,6 +18,8 @@ import { DynamoClientImpl } from "../clients/dynamo.client.js";
 import { BedrockClientImpl } from "../clients/bedrock.client.js";
 import { OpenSearchServerlessClientImpl } from "../clients/opensearch-serverless.client.js";
 import { StsClientImpl } from "../clients/sts.client.js";
+import { createCredentialProvider } from "../internal/utils/credentials.util.js";
+import { resolveCredentials } from "../internal/aws/credentials-resolver.js";
 
 export class AwsProvider {
   private _s3Sdk?: S3SDKClient;
@@ -25,8 +28,11 @@ export class AwsProvider {
   private _bedrockAgentSdk?: BedrockAgentClient;
   private _bedrockRuntimeSdk?: BedrockAgentRuntimeClient;
   private _stsSdk?: STSSDKClient;
+  private readonly _credentialProvider: AwsCredentialIdentityProvider;
 
-  constructor(private readonly config: AwsProviderConfig) {}
+  constructor(private readonly config: AwsProviderConfig) {
+    this._credentialProvider = createCredentialProvider(config.credentials);
+  }
 
   s3(bucketName: string): IS3Client {
     return new S3ClientImpl(this.getS3Sdk(), bucketName);
@@ -81,7 +87,7 @@ export class AwsProvider {
   private buildSdkConfig() {
     return {
       region: this.config.region,
-      ...(this.config.credentials !== undefined && { credentials: this.config.credentials }),
+      credentials: this._credentialProvider,
       ...(this.config.endpoint !== undefined && { endpoint: this.config.endpoint }),
     };
   }
