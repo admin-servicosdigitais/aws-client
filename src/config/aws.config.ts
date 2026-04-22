@@ -6,6 +6,8 @@ export interface AwsCredentials {
   sessionToken?: string;
 }
 
+export type AwsCredentialInput = AwsCredentials | AwsCredentialIdentityProvider;
+
 export interface AwsProviderConfig {
   region: string;
   credentials?: AwsCredentials | AwsCredentialIdentityProvider;

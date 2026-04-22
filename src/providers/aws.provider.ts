@@ -20,6 +20,8 @@ import { DynamoClientImpl } from "../clients/dynamo.client.js";
 import { BedrockClientImpl } from "../clients/bedrock.client.js";
 import { OpenSearchServerlessClientImpl } from "../clients/opensearch-serverless.client.js";
 import { StsClientImpl } from "../clients/sts.client.js";
+import { createCredentialProvider } from "../internal/utils/credentials.util.js";
+import { resolveCredentials } from "../internal/aws/credentials-resolver.js";
 
 export class AwsProvider {
   private _s3Sdk?: S3SDKClient;
@@ -30,7 +32,9 @@ export class AwsProvider {
   private _stsSdk?: STSSDKClient;
   private _resolvedCredentials?: AwsProviderConfig["credentials"];
 
-  constructor(private readonly config: AwsProviderConfig) {}
+  constructor(private readonly config: AwsProviderConfig) {
+    this._credentialProvider = createCredentialProvider(config.credentials);
+  }
 
   s3(bucketName: string): IS3Client {
     return new S3ClientImpl(this.getS3Sdk(), bucketName);
