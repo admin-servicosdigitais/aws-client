@@ -26,6 +26,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@aws-sdk/credential-providers": "^3.1034.0",
     "@types/node": "^25.6.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.8"
@@ -36,10 +37,11 @@
     "@aws-sdk/client-dynamodb": "^3.1032.0",
     "@aws-sdk/client-s3": "^3.1032.0",
     "@aws-sdk/client-sqs": "^3.1032.0",
+    "@aws-sdk/client-sts": "^3.1032.0",
+    "@aws-sdk/credential-provider-node": "^3.972.32",
+    "@aws-sdk/credential-providers": "^3.1032.0",
     "@aws-sdk/lib-dynamodb": "^3.1032.0",
     "@aws-sdk/s3-request-presigner": "^3.1032.0",
-    "@opensearch-project/opensearch": "^2.13.0",
-    "@aws-sdk/client-sts": "^3.1032.0",
-    "@aws-sdk/credential-provider-node": "^3.972.32"
+    "@opensearch-project/opensearch": "^2.13.0"
   }
 }
