@@ -10,6 +10,6 @@ export type AwsCredentialInput = AwsCredentials | AwsCredentialIdentityProvider;
 
 export interface AwsProviderConfig {
   region: string;
-  credentials?: AwsCredentialInput;
+  credentials?: AwsCredentials | AwsCredentialIdentityProvider;
   endpoint?: string;
 }

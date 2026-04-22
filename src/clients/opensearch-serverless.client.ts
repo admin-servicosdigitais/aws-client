@@ -1,5 +1,5 @@
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
-import type { AwsCredentialIdentityProvider } from "@aws-sdk/types";
+import type { AwsCredentialIdentity, AwsCredentialIdentityProvider } from "@aws-sdk/types";
 import { AwsSigv4Signer } from "@opensearch-project/opensearch/aws-v3";
 import { Client } from "@opensearch-project/opensearch";
 import type { AwsCredentialInput } from "../config/aws.config.js";
@@ -33,7 +33,7 @@ export class OpenSearchServerlessClientImpl implements IOpenSearchClient {
   constructor(
     private readonly node: string,
     private readonly region: string,
-    private readonly credentials?: AwsCredentialInput,
+    private readonly credentials?: AwsCredentials | AwsCredentialIdentityProvider,
   ) {}
 
   createIndex(indexName: string, options?: CreateIndexOptions): Promise<void> {
@@ -124,12 +124,11 @@ export class OpenSearchServerlessClientImpl implements IOpenSearchClient {
   private getClient(): Client {
     if (!this.client) {
       const explicitCredentials = this.credentials;
-      const getCredentials: AwsCredentialIdentityProvider =
-        explicitCredentials === undefined
-          ? defaultProvider()
-          : typeof explicitCredentials === "function"
-            ? explicitCredentials
-            : async () => explicitCredentials;
+      const getCredentials: () => Promise<AwsCredentialIdentity> = explicitCredentials
+        ? typeof explicitCredentials === "function"
+          ? explicitCredentials
+          : () => Promise.resolve(explicitCredentials)
+        : () => defaultProvider()();
 
       this.client = new Client({
         ...AwsSigv4Signer({

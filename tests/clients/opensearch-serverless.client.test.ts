@@ -392,6 +392,31 @@ describe("OpenSearchServerlessClientImpl", () => {
     expect(defaultProviderMock).toHaveBeenCalledTimes(1);
   });
 
+  it("usa provider assíncrono quando fornecido", async () => {
+    const openSearchMock = createOpenSearchMock();
+    openSearchMock.indices.exists.mockResolvedValue({ body: true });
+    clientCtorMock.mockReturnValue(openSearchMock);
+
+    const asyncCredentialsProvider = vi.fn().mockResolvedValue({
+      accessKeyId: "ASYNC",
+      secretAccessKey: "ASYNC_SECRET",
+      sessionToken: "ASYNC_TOKEN",
+    });
+
+    const client = new OpenSearchServerlessClientImpl(node, region, asyncCredentialsProvider);
+
+    await client.indexExists("produtos");
+
+    const signerOptions = signerMock.mock.calls[0]?.[0] as { getCredentials: () => Promise<AwsCredentials> };
+    await expect(signerOptions.getCredentials()).resolves.toEqual({
+      accessKeyId: "ASYNC",
+      secretAccessKey: "ASYNC_SECRET",
+      sessionToken: "ASYNC_TOKEN",
+    });
+    expect(asyncCredentialsProvider).toHaveBeenCalledTimes(1);
+    expect(defaultProviderMock).not.toHaveBeenCalled();
+  });
+
   it("mapeia erros para AwsClientError", async () => {
     const openSearchMock = createOpenSearchMock();
     openSearchMock.indices.create.mockRejectedValue(new Error("boom"));
